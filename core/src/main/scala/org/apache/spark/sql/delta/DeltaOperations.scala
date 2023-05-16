@@ -24,10 +24,8 @@ import org.apache.spark.sql.delta.util.JsonUtils
 
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
-import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.plans.logical.DeltaMergeIntoClause
 import org.apache.spark.sql.execution.metric.SQLMetric
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.{StructField, StructType}
 
@@ -42,7 +40,7 @@ object DeltaOperations {
    * @param name The name of the operation.
    */
   sealed abstract class Operation(val name: String) {
-    def parameters: Map[String, Any]
+    val parameters: Map[String, Any]
 
     lazy val jsonEncodedValues: Map[String, String] =
       parameters.mapValues(JsonUtils.toJson(_)).toMap
@@ -59,12 +57,6 @@ object DeltaOperations {
 
     /** Whether this operation changes data */
     def changesData: Boolean = false
-  }
-
-  abstract class OperationWithPredicates(name: String, val predicates: Seq[Expression])
-      extends Operation(name) {
-    private val predicateString = JsonUtils.toJson(predicatesToString(predicates))
-    override def parameters: Map[String, Any] = Map("predicate" -> predicateString)
   }
 
   /** Recorded during batch inserts. Predicates can be provided for overwrites. */
@@ -131,8 +123,8 @@ object DeltaOperations {
     override def changesData: Boolean = true
   }
   /** Recorded while deleting certain partitions. */
-  case class Delete(predicate: Seq[Expression])
-      extends OperationWithPredicates("DELETE", predicate) {
+  case class Delete(predicate: Seq[String]) extends Operation("DELETE") {
+    override val parameters: Map[String, Any] = Map("predicate" -> JsonUtils.toJson(predicate))
     override val operationMetrics: Set[String] = DeltaOperationMetrics.DELETE
 
     override def transformMetrics(metrics: Map[String, SQLMetric]): Map[String, String] = {
@@ -182,7 +174,7 @@ object DeltaOperations {
   object MergePredicate {
     def apply(mergeClause: DeltaMergeIntoClause): MergePredicate = {
       MergePredicate(
-        predicate = mergeClause.condition.map(_.simpleString(SQLConf.get.maxToStringFields)),
+        predicate = mergeClause.condition.map(_.sql),
         mergeClause.clauseType.toLowerCase())
     }
   }
@@ -196,17 +188,16 @@ object DeltaOperations {
    */
   val OP_MERGE = "MERGE"
   case class Merge(
-      predicate: Option[Expression],
+      predicate: Option[String],
       updatePredicate: Option[String],
       deletePredicate: Option[String],
       insertPredicate: Option[String],
       matchedPredicates: Seq[MergePredicate],
       notMatchedPredicates: Seq[MergePredicate],
-      notMatchedBySourcePredicates: Seq[MergePredicate])
-    extends OperationWithPredicates(OP_MERGE, predicate.toSeq) {
+      notMatchedBySourcePredicates: Seq[MergePredicate]) extends Operation(OP_MERGE) {
 
     override val parameters: Map[String, Any] = {
-      super.parameters ++
+      predicate.map("predicate" -> _).toMap ++
         updatePredicate.map("updatePredicate" -> _).toMap ++
         deletePredicate.map("deletePredicate" -> _).toMap ++
         insertPredicate.map("insertPredicate" -> _).toMap +
@@ -239,7 +230,7 @@ object DeltaOperations {
   object Merge {
     /** constructor to provide default values for deprecated fields */
     def apply(
-        predicate: Option[Expression],
+        predicate: Option[String],
         matchedPredicates: Seq[MergePredicate],
         notMatchedPredicates: Seq[MergePredicate],
         notMatchedBySourcePredicates: Seq[MergePredicate]): Merge = Merge(
@@ -253,8 +244,8 @@ object DeltaOperations {
   }
 
   /** Recorded when an update operation is committed to the table. */
-  case class Update(predicate: Option[Expression])
-      extends OperationWithPredicates("UPDATE", predicate.toSeq) {
+  case class Update(predicate: Option[String]) extends Operation("UPDATE") {
+    override val parameters: Map[String, Any] = predicate.map("predicate" -> _).toMap
     override val operationMetrics: Set[String] = DeltaOperationMetrics.UPDATE
 
     override def changesData: Boolean = true
@@ -407,8 +398,10 @@ object DeltaOperations {
   }
 
   /** Recorded when recomputing stats on the table. */
-  case class ComputeStats(predicate: Seq[Expression])
-      extends OperationWithPredicates("COMPUTE STATS", predicate)
+  case class ComputeStats(predicate: Seq[String]) extends Operation("COMPUTE STATS") {
+    override val parameters: Map[String, Any] = Map(
+      "predicate" -> JsonUtils.toJson(predicate))
+  }
 
   /** Recorded when restoring a Delta table to an older version. */
   case class Restore(
@@ -422,8 +415,7 @@ object DeltaOperations {
     override val operationMetrics: Set[String] = DeltaOperationMetrics.RESTORE
   }
 
-  sealed abstract class OptimizeOrReorg(override val name: String, predicates: Seq[Expression])
-    extends OperationWithPredicates(name, predicates)
+  sealed abstract class OptimizeOrReorg(override val name: String) extends Operation(name)
 
   /** operation name for OPTIMIZE command */
   val OPTIMIZE_OPERATION_NAME = "OPTIMIZE"
@@ -432,10 +424,11 @@ object DeltaOperations {
 
   /** Recorded when optimizing the table. */
   case class Optimize(
-      predicate: Seq[Expression],
+      predicate: Seq[String],
       zOrderBy: Seq[String] = Seq.empty
-  ) extends OptimizeOrReorg(OPTIMIZE_OPERATION_NAME, predicate) {
-    override val parameters: Map[String, Any] = super.parameters ++ Map(
+  ) extends OptimizeOrReorg(OPTIMIZE_OPERATION_NAME) {
+    override val parameters: Map[String, Any] = Map(
+      "predicate" -> JsonUtils.toJson(predicate),
       ZORDER_PARAMETER_KEY -> JsonUtils.toJson(zOrderBy)
     )
 
@@ -505,15 +498,6 @@ object DeltaOperations {
   /** Dummy operation only for testing with arbitrary operation names */
   case class TestOperation(operationName: String = "TEST") extends Operation(operationName) {
     override val parameters: Map[String, Any] = Map.empty
-  }
-
-  /**
-   * Helper method to convert a sequence of command predicates in the form of an
-   * [[Expression]]s to a sequence of Strings so be stored in the commit info.
-   */
-  def predicatesToString(predicates: Seq[Expression]): Seq[String] = {
-    val maxToStringFields = SQLConf.get.maxToStringFields
-    predicates.map(_.simpleString(maxToStringFields))
   }
 }
 

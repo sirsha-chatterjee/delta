@@ -243,8 +243,6 @@ trait DataSkippingReaderBase
     }
   }
 
-  def withStatsDeduplicated: DataFrame = withStats
-
   /**
    * Builds the data filters for data skipping.
    */

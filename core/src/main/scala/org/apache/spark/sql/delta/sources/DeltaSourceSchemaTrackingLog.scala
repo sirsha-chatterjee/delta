@@ -103,14 +103,11 @@ object PersistedSchema {
  *
  * @param rootSchemaLocation Schema log location
  * @param sourceSnapshot Delta source snapshot for the Delta streaming source
- * @param initSchemaLogEagerly If true, initialize schema log as early as possible, otherwise,
- *                             initialize only when detecting non-additive schema change.
  */
 class DeltaSourceSchemaTrackingLog private(
     sparkSession: SparkSession,
     rootSchemaLocation: String,
-    sourceSnapshot: Snapshot,
-    val initSchemaLogEagerly: Boolean = true)
+    sourceSnapshot: Snapshot)
   extends HDFSMetadataLog[PersistedSchema](sparkSession, rootSchemaLocation) {
   import PersistedSchema._
 
@@ -204,15 +201,9 @@ object DeltaSourceSchemaTrackingLog {
       sparkSession: SparkSession,
       rootSchemaLocation: String,
       sourceSnapshot: Snapshot,
-      sourceTrackingId: Option[String] = None,
-      initSchemaLogEagerly: Boolean = true): DeltaSourceSchemaTrackingLog = {
+      sourceTrackingId: Option[String] = None): DeltaSourceSchemaTrackingLog = {
     val schemaTrackingLocation = fullSchemaTrackingLocation(
       rootSchemaLocation, sourceSnapshot.deltaLog.tableId, sourceTrackingId)
-    new DeltaSourceSchemaTrackingLog(
-      sparkSession,
-      schemaTrackingLocation,
-      sourceSnapshot,
-      initSchemaLogEagerly
-    )
+    new DeltaSourceSchemaTrackingLog(sparkSession, schemaTrackingLocation, sourceSnapshot)
   }
 }

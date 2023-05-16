@@ -89,7 +89,8 @@ case class PreprocessTimeTravel(sparkSession: SparkSession) extends Rule[Logical
           // If table exists and not found to be a view, throw not supported error
           throw DeltaErrors.notADeltaTableException("RESTORE")
         } else {
-          ur.tableNotFound(ur.multipartIdentifier)
+          ur.failAnalysis(msg = s"Table not found: " +
+            s"${ur.multipartIdentifier.map(quoteIfNeeded).mkString(".")}")
         }
       }
 

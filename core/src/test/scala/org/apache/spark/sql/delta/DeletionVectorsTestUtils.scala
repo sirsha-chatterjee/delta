@@ -27,8 +27,7 @@ import org.apache.spark.sql.delta.storage.dv.DeletionVectorStore
 import org.apache.spark.sql.delta.util.PathWithFileSystem
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.sql.{DataFrame, QueryTest, RuntimeConfig, SparkSession}
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.{DataFrame, QueryTest, SparkSession}
 import org.apache.spark.sql.test.SharedSparkSession
 
 /** Collection of test utilities related with persistent Deletion Vectors. */
@@ -125,10 +124,6 @@ trait DeletionVectorsTestUtils extends QueryTest with SharedSparkSession {
     }
   }
 
-  /** Enable persistent deletion vectors in new Delta tables. */
-  def enableDeletionVectorsInNewTables(conf: RuntimeConfig): Unit =
-    conf.set(DeltaConfigs.ENABLE_DELETION_VECTORS_CREATION.defaultTablePropertyKey, "true")
-
   /** Enable persistent Deletion Vectors in a Delta table. */
   def enableDeletionVectorsInTable(tablePath: Path, enable: Boolean): Unit =
     spark.sql(
@@ -139,12 +134,6 @@ trait DeletionVectorsTestUtils extends QueryTest with SharedSparkSession {
   /** Enable persistent Deletion Vectors in a Delta table. */
   def enableDeletionVectorsInTable(deltaLog: DeltaLog, enable: Boolean = true): Unit =
     enableDeletionVectorsInTable(deltaLog.dataPath, enable)
-
-  /** Enable persistent deletion vectors in new tables and DELETE DML commands. */
-  def enableDeletionVectors(conf: RuntimeConfig): Unit = {
-    enableDeletionVectorsInNewTables(conf)
-    conf.set(DeltaSQLConf.DELETE_USE_PERSISTENT_DELETION_VECTORS.key, "true")
-  }
 
   // ======== HELPER METHODS TO WRITE DVs ==========
   /** Helper method to remove the specified rows in the given file using DVs */
@@ -172,14 +161,6 @@ trait DeletionVectorsTestUtils extends QueryTest with SharedSparkSession {
     txn.commit(actions, Truncate())
   }
 
-  protected def getFileActionsInLastVersion(log: DeltaLog): (Seq[AddFile], Seq[RemoveFile]) = {
-    val version = log.update().version
-    val allFiles = log.getChanges(version).toSeq.head._2
-    val add = allFiles.collect { case a: AddFile => a }
-    val remove = allFiles.collect { case r: RemoveFile => r }
-    (add, remove)
-  }
-
   protected def serializeRoaringBitmapArrayWithDefaultFormat(
       dv: RoaringBitmapArray): Array[Byte] = {
     val serializationFormat = RoaringBitmapArrayFormat.Portable
@@ -199,22 +180,6 @@ trait DeletionVectorsTestUtils extends QueryTest with SharedSparkSession {
       currentFile: AddFile,
       dv: RoaringBitmapArray): Seq[Action] = {
     writeFileWithDVOnDisk(log, currentFile, dv)
-  }
-
-  /** Name of the partition column used by [[createTestDF()]]. */
-  val PARTITION_COL = "partitionColumn"
-
-  def createTestDF(
-    start: Long,
-    end: Long,
-    numFiles: Int,
-    partitionColumn: Option[Int] = None): DataFrame = {
-    val df = spark.range(start, end, 1, numFiles).withColumn("v", col("id"))
-    if (partitionColumn.isEmpty) {
-      df
-    } else {
-      df.withColumn(PARTITION_COL, lit(partitionColumn.get))
-    }
   }
 
   /**
@@ -264,8 +229,7 @@ trait DeletionVectorsTestUtils extends QueryTest with SharedSparkSession {
           cardinality = dv.cardinality,
           offset = Some(range.offset))
         val (add, remove) = currentFile.removeRows(
-          dvData,
-          updateStats = true
+          dvData
         )
         Seq(add, remove)
       }
@@ -312,8 +276,7 @@ trait DeletionVectorsTestUtils extends QueryTest with SharedSparkSession {
       addFile: AddFile,
       dvDescriptor: DeletionVectorDescriptor): (AddFile, RemoveFile) = {
     addFile.removeRows(
-      dvDescriptor,
-      updateStats = true
+      dvDescriptor
     )
   }
 

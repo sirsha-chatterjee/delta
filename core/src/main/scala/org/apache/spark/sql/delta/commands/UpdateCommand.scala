@@ -219,7 +219,7 @@ case class UpdateCommand(
     txn.registerSQLMetrics(sparkSession, metrics)
 
     val finalActions = createSetTransaction(sparkSession, deltaLog).toSeq ++ totalActions
-    txn.commitIfNeeded(finalActions, DeltaOperations.Update(condition))
+    txn.commitIfNeeded(finalActions, DeltaOperations.Update(condition.map(_.toString)))
     sendDriverMetrics(sparkSession, metrics)
 
     recordDeltaEvent(

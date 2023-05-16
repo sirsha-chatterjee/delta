@@ -244,7 +244,6 @@ class DeltaDataSource
       sourceSnapshot: Snapshot,
       parameters: Map[String, String]): Option[DeltaSourceSchemaTrackingLog] = {
     val options = new CaseInsensitiveStringMap(parameters.asJava)
-
     Option(options.get(DeltaOptions.SCHEMA_TRACKING_LOCATION))
       .orElse(Option(options.get(DeltaOptions.SCHEMA_TRACKING_LOCATION_ALIAS)))
       .map { schemaTrackingLocation =>
@@ -256,8 +255,7 @@ class DeltaDataSource
         }
         DeltaSourceSchemaTrackingLog.create(
           spark, schemaTrackingLocation, sourceSnapshot,
-          Option(options.get(DeltaOptions.STREAMING_SOURCE_TRACKING_ID))
-        )
+          Option(options.get(DeltaOptions.STREAMING_SOURCE_TRACKING_ID)))
       }
   }
 

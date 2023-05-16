@@ -2022,7 +2022,8 @@ class DeltaTableCreationSuite
 
         checkAnswer(
           sql(s"COMMENT ON TABLE $emptyTableName IS 'My Empty Cool Table'"), Nil)
-        assert(sql(s"DESCRIBE TABLE $emptyTableName").collect().length == 0)
+        var answer = 3
+        assert(sql(s"DESCRIBE TABLE $emptyTableName").collect().length == answer)
 
         // create table, alter tbl property, tbl comment
         assert(sql(s"DESCRIBE HISTORY $emptyTableName").collect().length == 3)

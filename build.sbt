@@ -17,7 +17,7 @@
 import java.nio.file.Files
 import TestParallelization._
 
-val sparkVersion = "3.4.0"
+val sparkVersion = "3.3.2"
 val scala212 = "2.12.15"
 val scala213 = "2.13.5"
 val default_scala_version = scala212
@@ -204,8 +204,6 @@ lazy val storageS3DynamoDB = (project in file("storage-s3-dynamodb"))
     )
   )
 
-// Requires iceberg release on 3.4
-/**
 lazy val deltaIceberg = (project in file("delta-iceberg"))
   .dependsOn(core % "compile->compile;test->test;provided->provided")
   .settings (
@@ -223,7 +221,6 @@ lazy val deltaIceberg = (project in file("delta-iceberg"))
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.1.1"
     )
   )
-*/
 
 /**
  * Get list of python files and return the mapping between source files and target paths

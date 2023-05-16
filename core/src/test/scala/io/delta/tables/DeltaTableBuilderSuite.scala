@@ -366,8 +366,7 @@ class DeltaTableBuilderSuite extends QueryTest with SharedSparkSession with Delt
       }
       assert(e.getMessage == "Database 'main.parquet' not found" ||
         e.getMessage == "Database 'parquet' not found" ||
-        e.getMessage.contains("is not a valid name") ||
-        e.getMessage.contains("schema `parquet` cannot be found")
+        e.getMessage.contains("is not a valid name")
       )
     }
   }

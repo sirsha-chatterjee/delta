@@ -219,19 +219,15 @@ case class AlterTableAddColumnsDeltaCommand(
       val resolver = sparkSession.sessionState.conf.resolver
       val newSchema = colsToAddWithPosition.foldLeft(oldSchema) {
         case (schema, QualifiedColTypeWithPosition(columnPath, column, None)) =>
-          val parentPosition = SchemaUtils.findColumnPosition(columnPath, schema, resolver)
-          val insertPosition = SchemaUtils.getNestedTypeFromPosition(schema, parentPosition) match {
-            case s: StructType => s.size
-            case other =>
-               throw DeltaErrors.addColumnParentNotStructException(column, other)
-          }
-          SchemaUtils.addColumn(schema, column, parentPosition :+ insertPosition)
+          val (parentPosition, lastSize) =
+            SchemaUtils.findColumnPosition(columnPath, schema, resolver)
+          SchemaUtils.addColumn(schema, column, parentPosition :+ lastSize)
         case (schema, QualifiedColTypeWithPosition(columnPath, column, Some(_: First))) =>
-          val parentPosition = SchemaUtils.findColumnPosition(columnPath, schema, resolver)
+          val (parentPosition, _) = SchemaUtils.findColumnPosition(columnPath, schema, resolver)
           SchemaUtils.addColumn(schema, column, parentPosition :+ 0)
         case (schema,
         QualifiedColTypeWithPosition(columnPath, column, Some(after: After))) =>
-          val prevPosition =
+          val (prevPosition, _) =
             SchemaUtils.findColumnPosition(columnPath :+ after.column, schema, resolver)
           val position = prevPosition.init :+ (prevPosition.last + 1)
           SchemaUtils.addColumn(schema, column, position)
@@ -298,7 +294,7 @@ case class AlterTableDropColumnsDeltaCommand(
         throw DeltaErrors.dropColumnNotSupported(suggestUpgrade = true)
       }
       val newSchema = columnsToDrop.foldLeft(metadata.schema) { case (schema, columnPath) =>
-        val parentPosition =
+        val (parentPosition, _) =
           SchemaUtils.findColumnPosition(
             columnPath, schema, sparkSession.sessionState.conf.resolver)
         SchemaUtils.dropColumn(schema, parentPosition)._1

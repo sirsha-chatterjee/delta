@@ -258,7 +258,7 @@ case class MergeIntoCommand(
         deltaTxn.commitIfNeeded(
           finalActions,
           DeltaOperations.Merge(
-            Option(condition),
+            Option(condition.sql),
             matchedClauses.map(DeltaOperations.MergePredicate(_)),
             notMatchedClauses.map(DeltaOperations.MergePredicate(_)),
             notMatchedBySourceClauses.map(DeltaOperations.MergePredicate(_))))

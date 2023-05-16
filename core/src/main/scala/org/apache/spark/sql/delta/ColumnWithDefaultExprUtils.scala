@@ -194,7 +194,6 @@ object ColumnWithDefaultExprUtils extends DeltaLogging {
       incrementalExecution.queryId,
       incrementalExecution.runId,
       incrementalExecution.currentBatchId,
-      incrementalExecution.prevOffsetSeqMetadata,
       incrementalExecution.offsetSeqMetadata
     )
     newIncrementalExecution.executedPlan // Force the lazy generation of execution plan

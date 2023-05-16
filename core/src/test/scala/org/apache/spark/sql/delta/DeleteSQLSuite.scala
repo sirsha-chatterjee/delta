@@ -122,5 +122,4 @@ class DeleteSQLWithDeletionVectorsSuite extends DeleteSQLSuite
       text = "SELECT key, value, 1 FROM tab",
       expectResult = Row(0, 3, 1) :: Nil)
   }
-
 }
