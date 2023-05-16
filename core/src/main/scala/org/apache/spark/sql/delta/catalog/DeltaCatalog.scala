@@ -103,6 +103,7 @@ class DeltaCatalog extends DelegatingCatalogExtension
     val conf = spark.sessionState.conf
 
     val isByPath = isPathIdentifier(ident)
+    printf("indent name: " +  ident.name() + "\n")
     if (isByPath && !conf.getConf(DeltaSQLConf.DELTA_LEGACY_ALLOW_AMBIGUOUS_PATHS)
       && allTableProperties.containsKey("location")
       // The location property can be qualified and different from the path in the identifier, so
@@ -113,8 +114,10 @@ class DeltaCatalog extends DelegatingCatalogExtension
         ident.name(), allTableProperties.get("location"))
     }
     val location = if (isByPath) {
+      printf("sirsha isByPath\n")
       Option(ident.name())
     } else {
+      printf("sirsha isByLocation\n" + allTableProperties.get("location") + "\n")
       Option(allTableProperties.get("location"))
     }
     val id = {
@@ -171,6 +174,7 @@ class DeltaCatalog extends DelegatingCatalogExtension
   override def loadTable(ident: Identifier): Table = recordFrameProfile(
       "DeltaCatalog", "loadTable") {
     try {
+
       super.loadTable(ident) match {
         case v1: V1Table if DeltaTableUtils.isDeltaTable(v1.catalogTable) =>
           DeltaTableV2(
@@ -263,6 +267,9 @@ class DeltaCatalog extends DelegatingCatalogExtension
       properties: util.Map[String, String]) : Table =
     recordFrameProfile("DeltaCatalog", "createTable") {
       if (DeltaSourceUtils.isDeltaDataSourceName(getProvider(properties))) {
+
+        printf("delta source name sirsha\n")
+
         createDeltaTable(
           ident,
           schema,
@@ -273,6 +280,7 @@ class DeltaCatalog extends DelegatingCatalogExtension
           TableCreationModes.Create
         )
       } else {
+        printf("delta catalog name sirsha \n")
         createCatalogTable(ident, schema, partitions, properties
         )
       }
